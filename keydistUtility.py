@@ -87,16 +87,9 @@ class AddHostDialog(wx.Dialog):
         localMountPoint     = self.localMountPointText.GetValue()
         remoteMountPoint    = self.remoteMountPointText.GetValue()
 
-        sshPaths = sshKeyDist.sshpaths()
-        skd = sshKeyDist.KeyDist(userName, hostName, self, sshPaths)
-        skd.distributeKey()
-        while (not skd.complete()):
-            wx.Yield()
-            time.sleep(1) # FIXME testing, change back to 0.1
-            print 'sleeping...'
+        self.keyManagerFrame.distributeKey(hostName, userName)
 
-        print 'done!'
-
+        # FIXME Should only do this on success...
         self.keyManagerFrame.keyInfo.append((hostName, userName, 'keyFileNameFIXME', localMountPoint, remoteMountPoint,))
         print self.keyManagerFrame.keyInfo
         self.keyManagerFrame.keyInfo = uniq(self.keyManagerFrame.keyInfo)
@@ -197,8 +190,9 @@ class KeyManagerFrame(wx.Frame):
             self.keySizer.Add(remoteMountPointText, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
             self.widgets.append(remoteMountPointText)
 
-            button = wx.Button(self.scrolled_panel, self.button_id, 'Edit')
+            button = wx.Button(self.scrolled_panel, self.button_id, 'Reinstall')
             button.keyInfo = (hostname, username, keyFileName,)
+            button.Bind(wx.EVT_BUTTON, self.onReinstall)
             self.keySizer.Add(button, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
             self.widgets.append(button)
             self.button_id += 1
@@ -218,6 +212,17 @@ class KeyManagerFrame(wx.Frame):
         self.scrolled_panel.Layout()
         self.scrolled_panel.SetupScrolling()
 
+    def distributeKey(self, hostName, userName):
+        sshPaths = sshKeyDist.sshpaths()
+        skd = sshKeyDist.KeyDist(userName, hostName, self, sshPaths)
+        skd.distributeKey()
+        while (not skd.complete()):
+            wx.Yield()
+            time.sleep(1) # FIXME testing, change back to 0.1
+            print 'sleeping...'
+        print 'done!'
+        # FIXME need an event here for timeout, successful key install, etc.
+
     def onAdd(self, event):
         # FIXME testing only
         # hostname = str(self.button_id)
@@ -236,7 +241,16 @@ class KeyManagerFrame(wx.Frame):
         # FIXME delete the remote key?
         self.drawKeytableSizer()
 
+    def onReinstall(self, event):
+        (hostname, username, _) = event.GetEventObject().keyInfo
+
+        self.distributeKey(hostname, username)
+
 if __name__ == '__main__':
     app = wx.App(False)
     frame = KeyManagerFrame().Show()
     app.MainLoop()
+
+
+
+
