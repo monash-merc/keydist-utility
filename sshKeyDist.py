@@ -12,6 +12,7 @@ import sys
 from os.path import expanduser
 import subprocess
 import traceback
+import socket
 from utilityFunctions import logger_debug, logger_error
 
 OPENSSH_BUILD_DIR = 'openssh-cygwin-stdin-build'
@@ -366,7 +367,6 @@ class KeyDist():
                                                                                                                                                                                                              host=self.keydistObject.host,
                                                                                                                                                                                                              nonexistantpath=path)
 
-
             logger_debug('testAuthThread: attempting: ' + ssh_cmd)
             ssh = subprocess.Popen(ssh_cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,shell=True,universal_newlines=True)
             stdout, stderr = ssh.communicate()
@@ -507,6 +507,14 @@ class KeyDist():
                 self.keydistObject.keycopiedLock.release()
                 event = KeyDist.sshKeyDistEvent(KeyDist.EVT_KEYDIST_TESTAUTH,self.keydistObject)
                 logger_debug('CopyIDThread: successfully copied the key')
+            except socket.gaierror as e:
+                logger_debug('CopyIDThread: socket.gaierror : ' + str(e))
+                self.keydistObject.cancel(message=str(e))
+                return
+            except socket.error as e:
+                logger_debug('CopyIDThread: socket.error : ' + str(e))
+                self.keydistObject.cancel(message=str(e))
+                return
             except ssh.AuthenticationException as e:
                 logger_debug('CopyIDThread: ssh.AuthenticationException: ' + str(e))
                 event = KeyDist.sshKeyDistEvent(KeyDist.EVT_KEYDIST_COPYID_NEEDPASS,self.keydistObject,str(e))
