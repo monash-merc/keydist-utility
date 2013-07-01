@@ -26,7 +26,8 @@ def loadKeyInfo():
 def saveKeyInfo(keyInfo):
     json.dump(keyInfo, open(KEY_INFO_FILE, 'w'), sort_keys=True, indent=4, separators=(',', ': '))
 
-EvtRedrawKeytable, EVT_REDRAW_KEYTABLE = wx.lib.newevent.NewEvent()
+EvtRedrawKeytable,          EVT_REDRAW_KEYTABLE             = wx.lib.newevent.NewEvent()
+EvtCancelKeyDistribution,   EVT_CANCEL_KEY_DISTRIBUTION     = wx.lib.newevent.NewEvent()
 
 class AddHostDialog(wx.Dialog):
     def __init__(self):
@@ -87,18 +88,17 @@ class AddHostDialog(wx.Dialog):
         localMountPoint     = self.localMountPointText.GetValue()
         remoteMountPoint    = self.remoteMountPointText.GetValue()
 
-        self.keyManagerFrame.distributeKey(hostName, userName)
+        userCanAbort            = True
+        maximumProgressBarValue = 10
 
-        # FIXME Should only do this on success...
-        self.keyManagerFrame.keyInfo.append((hostName, userName, 'keyFileNameFIXME', localMountPoint, remoteMountPoint,))
-        print self.keyManagerFrame.keyInfo
-        self.keyManagerFrame.keyInfo = uniq(self.keyManagerFrame.keyInfo)
+        self.keyManagerFrame.hostName           = hostName
+        self.keyManagerFrame.userName           = userName
+        self.keyManagerFrame.localMountPoint    = localMountPoint
+        self.keyManagerFrame.remoteMountPoint   = remoteMountPoint
 
-        wx.PostEvent(self.keyManagerFrame.GetEventHandler(), EvtRedrawKeytable())
+        self.keyManagerFrame.runDistributeKey()
+
         self.Destroy()
-        saveKeyInfo(self.keyManagerFrame.keyInfo)
-
-        
 
 class KeyManagerFrame(wx.Frame):
     def __init__(self):
@@ -212,16 +212,33 @@ class KeyManagerFrame(wx.Frame):
         self.scrolled_panel.Layout()
         self.scrolled_panel.SetupScrolling()
 
-    def distributeKey(self, hostName, userName):
+    def onKeyDistSuccess(self):
+        # The sshKeyDist module successfully installed the ssh key on the remove server. Yay!
+
+        # Append the new key/mountpoint info to our list.
+        self.keyInfo.append((self.hostName, self.userName, 'keyFileNameFIXME', self.localMountPoint, self.remoteMountPoint,))
+        self.keyInfo = uniq(self.keyInfo)
+
+        # Redraw the table of keypairs.
+        wx.PostEvent(self.GetEventHandler(), EvtRedrawKeytable())
+
+        # Commit the new key/mountpoint info to disk.
+        saveKeyInfo(self.keyInfo)
+
+        # Let the user know that it finished.
+        def showKeyDistSuccessDialog():
+            dlg = wx.MessageDialog(self, "Key successfully installed.\n", "CVL Key Utility", wx.OK | wx.ICON_INFORMATION)
+            dlg.ShowModal()
+            dlg.Destroy()
+        wx.CallAfter(showKeyDistSuccessDialog)
+
+    def onKeyDistFail(self):
+        print 'onKeyDistFail'
+
+    def runDistributeKey(self):
         sshPaths = sshKeyDist.sshpaths()
-        skd = sshKeyDist.KeyDist(userName, hostName, self, sshPaths)
-        skd.distributeKey()
-        while (not skd.complete()):
-            wx.Yield()
-            time.sleep(1) # FIXME testing, change back to 0.1
-            print 'sleeping...'
-        print 'done!'
-        # FIXME need an event here for timeout, successful key install, etc.
+        skd = sshKeyDist.KeyDist(self.userName, self.hostName, self, sshPaths)
+        skd.distributeKey(callback_success=self.onKeyDistSuccess, callback_fail=self.onKeyDistFail)
 
     def onAdd(self, event):
         # FIXME testing only
@@ -242,9 +259,9 @@ class KeyManagerFrame(wx.Frame):
         self.drawKeytableSizer()
 
     def onReinstall(self, event):
-        (hostname, username, _) = event.GetEventObject().keyInfo
+        (self.hostname, self.username, _) = event.GetEventObject().keyInfo
 
-        self.distributeKey(hostname, username)
+        self.runDistributeKey()
 
 if __name__ == '__main__':
     app = wx.App(False)
