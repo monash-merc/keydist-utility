@@ -26,6 +26,13 @@ def loadKeyInfo():
 def saveKeyInfo(keyInfo):
     json.dump(keyInfo, open(KEY_INFO_FILE, 'w'), sort_keys=True, indent=4, separators=(',', ': '))
 
+def isValidHostname(h):
+    return all([x.isalnum() or x in ['-', '.'] for x in h])
+
+def isValidUsername(u):
+    # FIXME check this
+    return all([x.isalnum() or x in ['-', '.'] for x in u])
+
 EvtRedrawKeytable,          EVT_REDRAW_KEYTABLE             = wx.lib.newevent.NewEvent()
 EvtCancelKeyDistribution,   EVT_CANCEL_KEY_DISTRIBUTION     = wx.lib.newevent.NewEvent()
 
@@ -95,6 +102,22 @@ class AddHostDialog(wx.Dialog):
         self.keyManagerFrame.userName           = userName
         self.keyManagerFrame.localMountPoint    = localMountPoint
         self.keyManagerFrame.remoteMountPoint   = remoteMountPoint
+
+        if not isValidHostname(hostName):
+            def showHostnameInvalidDialog():
+                dlg = wx.MessageDialog(self, "Sorry, hostnames may only contain a-z, A-Z, 0-9, and periods.\n", "CVL Key Utility", wx.OK | wx.ICON_INFORMATION)
+                dlg.ShowModal()
+                dlg.Destroy()
+            wx.CallAfter(showHostnameInvalidDialog)
+            return
+
+        if not isValidUsername(userName):
+            def showUsernameInvalidDialog():
+                dlg = wx.MessageDialog(self, "Sorry, usernames may only contain a-z, A-Z, 0-9, and '-'.\n", "CVL Key Utility", wx.OK | wx.ICON_INFORMATION)
+                dlg.ShowModal()
+                dlg.Destroy()
+            wx.CallAfter(showUsernameInvalidDialog)
+            return
 
         self.keyManagerFrame.runDistributeKey()
 
