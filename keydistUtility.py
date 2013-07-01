@@ -173,7 +173,7 @@ class KeyManagerFrame(wx.Frame):
         self.keySizer.Add(deleteEmpty, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
         self.widgets.append(deleteEmpty)
 
-        for (hostname, username, keyFileName, localMountPoint, remoteMountPoint,) in sorted(self.keyInfo):
+        for (hostname, username, localMountPoint, remoteMountPoint,) in sorted(self.keyInfo):
             hostLabel = wx.StaticText(self.scrolled_panel, wx.ID_ANY, hostname)
             self.keySizer.Add(hostLabel, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
             self.widgets.append(hostLabel)
@@ -191,7 +191,7 @@ class KeyManagerFrame(wx.Frame):
             self.widgets.append(remoteMountPointText)
 
             button = wx.Button(self.scrolled_panel, self.button_id, 'Reinstall')
-            button.keyInfo = (hostname, username, keyFileName,)
+            button.keyInfo = (hostname, username,)
             button.Bind(wx.EVT_BUTTON, self.onReinstall)
             self.keySizer.Add(button, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
             self.widgets.append(button)
@@ -200,7 +200,7 @@ class KeyManagerFrame(wx.Frame):
             button = wx.Button(self.scrolled_panel, self.button_id, 'Delete')
             button.Bind(wx.EVT_BUTTON, self.onDelete)
 
-            button.keyInfo = (hostname, username, keyFileName, localMountPoint, remoteMountPoint,)
+            button.keyInfo = (hostname, username, localMountPoint, remoteMountPoint,)
             self.keySizer.Add(button, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
             self.widgets.append(button)
             self.button_id += 1
@@ -216,7 +216,7 @@ class KeyManagerFrame(wx.Frame):
         # The sshKeyDist module successfully installed the ssh key on the remove server. Yay!
 
         # Append the new key/mountpoint info to our list.
-        self.keyInfo.append((self.hostName, self.userName, 'keyFileNameFIXME', self.localMountPoint, self.remoteMountPoint,))
+        self.keyInfo.append((self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint,))
         self.keyInfo = uniq(self.keyInfo)
 
         # Redraw the table of keypairs.
@@ -236,7 +236,7 @@ class KeyManagerFrame(wx.Frame):
         print 'onKeyDistFail'
 
     def runDistributeKey(self):
-        sshPaths = sshKeyDist.sshpaths()
+        sshPaths = sshKeyDist.sshpaths('CVL_MANAGED_KEY')
         skd = sshKeyDist.KeyDist(self.userName, self.hostName, self, sshPaths)
         skd.distributeKey(callback_success=self.onKeyDistSuccess, callback_fail=self.onKeyDistFail)
 
@@ -259,7 +259,7 @@ class KeyManagerFrame(wx.Frame):
         self.drawKeytableSizer()
 
     def onReinstall(self, event):
-        (self.hostname, self.username, _) = event.GetEventObject().keyInfo
+        (self.hostname, self.username,) = event.GetEventObject().keyInfo
 
         self.runDistributeKey()
 
