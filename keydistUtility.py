@@ -11,6 +11,9 @@ import os
 import sshKeyDist
 import time
 
+import utilityFunctions
+utilityFunctions.configureLogger('keydist-utility')
+
 KEY_INFO_FILE = join(expanduser('~'), '.cvl_key_manager.cfg')
 
 def uniq(x):
