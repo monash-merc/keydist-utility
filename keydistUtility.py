@@ -89,6 +89,7 @@ class AddHostDialog(wx.Dialog):
         self.SetFocus()
 
     def onClose(self, event):
+        wx.CallAfter(self.keyManagerFrame.statusBar.SetStatusText, '')
         self.Destroy()
 
     def onOK(self, event):
@@ -122,13 +123,39 @@ class AddHostDialog(wx.Dialog):
             wx.CallAfter(showUsernameInvalidDialog)
             return
 
+        wx.CallAfter(self.keyManagerFrame.statusBar.SetStatusText, 'Configuring %s on host %s...' % (userName, hostName,))
         self.keyManagerFrame.runDistributeKey()
 
         self.Destroy()
 
+class StatusBar(wx.StatusBar):
+    def __init__(self, parent):
+        wx.StatusBar.__init__(self, parent)
+
+        self.SetFieldsCount(2)
+        self.SetStatusWidths([-5, -2])
+
 class KeyManagerFrame(wx.Frame):
     def __init__(self):
-        wx.Frame.__init__(self, None, wx.ID_ANY, "CVL Key Manager", size=(1000,500))
+        wx.Frame.__init__(self, None, wx.ID_ANY, "CVL Key Manager", size=(1100,500))
+
+        self.menu_bar = wx.MenuBar()
+
+        self.file_menu = wx.Menu()
+        self.file_menu.Append(wx.ID_ANY, "&Add\tAlt-A", "Add host.")
+        self.Bind(wx.EVT_MENU, self.onAdd, id=wx.ID_ANY)
+        self.file_menu.Append(wx.ID_EXIT, "E&xit\tAlt-X", "Close window and exit program.")
+        self.Bind(wx.EVT_MENU, self.onExit, id=wx.ID_EXIT)
+        self.menu_bar.Append(self.file_menu, "&File")
+
+        self.help_menu = wx.Menu()
+        self.help_menu.Append(wx.ID_ABOUT,   "&About CVL Key Manager")
+        self.Bind(wx.EVT_MENU, self.onAbout, id=wx.ID_ABOUT)
+        self.menu_bar.Append(self.help_menu, "&Help")
+        self.SetMenuBar(self.menu_bar)
+
+        self.statusBar = StatusBar(self)
+        self.SetStatusBar(self.statusBar)
 
         self.panel = wx.Panel(self, wx.ID_ANY)
 
@@ -150,7 +177,7 @@ class KeyManagerFrame(wx.Frame):
         bottomButtonPanelSizer.Add(btn)
 
         panelSizer = wx.BoxSizer(wx.VERTICAL)
-        panelSizer.AddSpacer(50)
+        #panelSizer.AddSpacer(50)
         panelSizer.Add(self.scrolled_panel, 1, wx.EXPAND)
         panelSizer.Add(bottomButtonPanelSizer, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_RIGHT)
         self.panel.SetSizer(panelSizer)
@@ -163,6 +190,12 @@ class KeyManagerFrame(wx.Frame):
         except:
             pass
         os.chmod(os.path.join(expanduser('~'), '.ssh'), 0700)
+
+    def onAbout(self, event):
+        pass
+
+    def onExit(self, event):
+        self.Destroy()
 
     def drawKeytableSizer(self, event=None):
         self.keySizer = wx.FlexGridSizer(rows=len(self.keyInfo), cols=6, vgap=5, hgap=10)
@@ -208,16 +241,22 @@ class KeyManagerFrame(wx.Frame):
             self.keySizer.Add(usernameLabel, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
             self.widgets.append(usernameLabel)
 
-            localMountPointText = wx.StaticText(self.scrolled_panel, wx.ID_ANY, localMountPoint)
+            if localMountPoint  == '':
+                localMountPointText = wx.StaticText(self.scrolled_panel, wx.ID_ANY, '<not specified>')
+            else:
+                localMountPointText = wx.StaticText(self.scrolled_panel, wx.ID_ANY, localMountPoint)
             self.keySizer.Add(localMountPointText, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
             self.widgets.append(localMountPointText)
 
-            remoteMountPointText = wx.StaticText(self.scrolled_panel, wx.ID_ANY, remoteMountPoint)
+            if remoteMountPoint == '':
+                remoteMountPointText = wx.StaticText(self.scrolled_panel, wx.ID_ANY, '<not specified>')
+            else:
+                remoteMountPointText = wx.StaticText(self.scrolled_panel, wx.ID_ANY, remoteMountPoint)
             self.keySizer.Add(remoteMountPointText, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
             self.widgets.append(remoteMountPointText)
 
             button = wx.Button(self.scrolled_panel, self.button_id, 'Reinstall')
-            button.keyInfo = (hostname, username,)
+            button.keyInfo = (hostname, username, localMountPoint, remoteMountPoint)
             button.Bind(wx.EVT_BUTTON, self.onReinstall)
             self.keySizer.Add(button, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
             self.widgets.append(button)
@@ -238,8 +277,11 @@ class KeyManagerFrame(wx.Frame):
         self.scrolled_panel.Layout()
         self.scrolled_panel.SetupScrolling()
 
+        self.statusBar.SetStatusText('')
+
     def onKeyDistSuccess(self):
         # The sshKeyDist module successfully installed the ssh key on the remove server. Yay!
+        self.statusBar.SetStatusText('')
 
         # Append the new key/mountpoint info to our list.
         self.keyInfo.append((self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint,))
@@ -259,9 +301,16 @@ class KeyManagerFrame(wx.Frame):
         wx.CallAfter(showKeyDistSuccessDialog)
 
     def onKeyDistFail(self):
-        print 'onKeyDistFail'
+        self.statusBar.SetStatusText('')
+        def showKeyDistFailDialog():
+            dlg = wx.MessageDialog(self, "Did not install key.\n", "CVL Key Utility", wx.OK | wx.ICON_INFORMATION)
+            dlg.ShowModal()
+            dlg.Destroy()
+        wx.CallAfter(showKeyDistFailDialog)
 
     def runDistributeKey(self):
+        self.statusBar.SetStatusText('Configuring %s on host %s' % (self.userName, self.hostName,))
+
         sshPaths = sshKeyDist.sshpaths('CVL_MANAGED_KEY')
         skd = sshKeyDist.KeyDist(self.userName, self.hostName, self, sshPaths)
         skd.distributeKey(callback_success=self.onKeyDistSuccess, callback_fail=self.onKeyDistFail)
@@ -285,8 +334,7 @@ class KeyManagerFrame(wx.Frame):
         self.drawKeytableSizer()
 
     def onReinstall(self, event):
-        (self.hostname, self.username,) = event.GetEventObject().keyInfo
-
+        (self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint) = event.GetEventObject().keyInfo
         self.runDistributeKey()
 
 if __name__ == '__main__':
