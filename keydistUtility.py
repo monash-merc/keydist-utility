@@ -11,6 +11,8 @@ import os
 import sshKeyDist
 import time
 
+# import launcher_progress_dialog
+
 import utilityFunctions
 utilityFunctions.configureLogger('keydist-utility')
 
@@ -89,7 +91,6 @@ class AddHostDialog(wx.Dialog):
         self.SetFocus()
 
     def onClose(self, event):
-        wx.CallAfter(self.keyManagerFrame.SetCursor, wx.StockCursor(wx.CURSOR_ARROW))
         wx.CallAfter(self.keyManagerFrame.statusBar.SetStatusText, '')
         self.Destroy()
 
@@ -125,7 +126,6 @@ class AddHostDialog(wx.Dialog):
             return
 
         wx.CallAfter(self.keyManagerFrame.statusBar.SetStatusText, 'Configuring %s on host %s...' % (userName, hostName,))
-        wx.CallAfter(self.keyManagerFrame.SetCursor, wx.StockCursor(wx.CURSOR_WAIT))
         self.keyManagerFrame.runDistributeKey()
 
         self.Destroy()
@@ -179,7 +179,7 @@ class KeyManagerFrame(wx.Frame):
         bottomButtonPanelSizer.Add(btn)
 
         panelSizer = wx.BoxSizer(wx.VERTICAL)
-        #panelSizer.AddSpacer(50)
+        # panelSizer.AddSpacer(50)
         panelSizer.Add(self.scrolled_panel, 1, wx.EXPAND)
         panelSizer.Add(bottomButtonPanelSizer, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_RIGHT)
         self.panel.SetSizer(panelSizer)
@@ -280,12 +280,11 @@ class KeyManagerFrame(wx.Frame):
         self.scrolled_panel.SetupScrolling()
 
         self.statusBar.SetStatusText('')
-        wx.CallAfter(self.SetCursor, wx.StockCursor(wx.CURSOR_ARROW))
 
     def onKeyDistSuccess(self):
         # The sshKeyDist module successfully installed the ssh key on the remove server. Yay!
         self.statusBar.SetStatusText('')
-        wx.CallAfter(self.SetCursor, wx.StockCursor(wx.CURSOR_ARROW))
+        wx.EndBusyCursor()
 
         # Append the new key/mountpoint info to our list.
         self.keyInfo.append((self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint,))
@@ -306,7 +305,7 @@ class KeyManagerFrame(wx.Frame):
 
     def onKeyDistFail(self):
         self.statusBar.SetStatusText('')
-        wx.CallAfter(self.keyManagerFrame.SetCursor, wx.StockCursor(wx.CURSOR_ARROW))
+        wx.EndBusyCursor()
 
         def showKeyDistFailDialog():
             dlg = wx.MessageDialog(self, "Did not install key.\n", "CVL Key Utility", wx.OK | wx.ICON_INFORMATION)
@@ -317,14 +316,13 @@ class KeyManagerFrame(wx.Frame):
     def runDistributeKey(self):
         self.statusBar.SetStatusText('Configuring %s on host %s' % (self.userName, self.hostName,))
 
+        wx.BeginBusyCursor()
+
         sshPaths = sshKeyDist.sshpaths('CVL_MANAGED_KEY')
         skd = sshKeyDist.KeyDist(self.userName, self.hostName, self, sshPaths)
         skd.distributeKey(callback_success=self.onKeyDistSuccess, callback_fail=self.onKeyDistFail)
 
     def onAdd(self, event):
-        # FIXME testing only
-        # hostname = str(self.button_id)
-        # username = str(self.button_id)
         dlg = AddHostDialog()
         dlg.keyManagerFrame = self
         dlg.ShowModal()
@@ -335,8 +333,6 @@ class KeyManagerFrame(wx.Frame):
     def onDelete(self, event):
         self.keyInfo = [z for z in self.keyInfo if z != event.GetEventObject().keyInfo]
         saveKeyInfo(self.keyInfo)
-        # FIXME delete the local key.
-        # FIXME delete the remote key?
         self.drawKeytableSizer()
 
     def onReinstall(self, event):
