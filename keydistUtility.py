@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # Help with scrolled panel thanks to: http://stackoverflow.com/questions/7795726/scrolledpanel-inside-panel-not-sizing
 
 import json
