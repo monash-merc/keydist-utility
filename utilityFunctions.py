@@ -418,7 +418,7 @@ def configureLogger(name):
 
     # Finally, send all log messages to a log file.
     from os.path import expanduser, join
-    logger_fh = logging.FileHandler(join(expanduser("~"), '.MASSIVE_Launcher_debug_log.txt'))
+    logger_fh = logging.FileHandler(join(expanduser("~"), '.cvl_key_manager.log'))
     logger_fh.setLevel(logging.DEBUG)
     logger_fh.setFormatter(logging.Formatter(log_format_string))
     logger.addHandler(logger_fh)
