@@ -409,12 +409,12 @@ def configureLogger(name):
     log_format_string = '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s'
 
     # Send all log messages to a string.
-    logger_output = StringIO()
-    string_handler = logging.StreamHandler(stream=logger_output)
-    string_handler.setLevel(logging.DEBUG)
-    string_handler.setFormatter(logging.Formatter(log_format_string))
-    logger.addHandler(string_handler)
-    transport_logger.addHandler(string_handler)
+    # logger_output = StringIO()
+    # string_handler = logging.StreamHandler(stream=logger_output)
+    # string_handler.setLevel(logging.DEBUG)
+    # string_handler.setFormatter(logging.Formatter(log_format_string))
+    # logger.addHandler(string_handler)
+    # transport_logger.addHandler(string_handler)
 
     # Finally, send all log messages to a log file.
     from os.path import expanduser, join
