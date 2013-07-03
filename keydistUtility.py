@@ -10,6 +10,9 @@ import os
 
 import sshKeyDist
 import time
+import threading
+import Queue
+import mountUtility
 
 # import launcher_progress_dialog
 
@@ -40,9 +43,62 @@ def isValidUsername(u):
 
 EvtRedrawKeytable,          EVT_REDRAW_KEYTABLE             = wx.lib.newevent.NewEvent()
 EvtCancelKeyDistribution,   EVT_CANCEL_KEY_DISTRIBUTION     = wx.lib.newevent.NewEvent()
+EvtSaveKeyInfo,             EVT_SAVE_KEY_INFO               = wx.lib.newevent.NewEvent()
+EvtCheckThreads,            EVT_CHECK_THREADS               = wx.lib.newevent.NewEvent()
+
+# These events take an argume, so we create a NewEventType and redefine the constructor
+#EVT_DO_MOUNT                    = wx.lib.newevent.NewEventType()
+#EVT_REEDIT_KEY_INFO             = wx.lib.newevent.NewEventType()
+EVT_DO_MOUNT_TYPE = wx.NewEventType()
+EVT_REEDIT_KEY_INFO_TYPE = wx.NewEventType()
+EVT_CHECK_THREADS_TYPE = wx.NewEventType()
+EVT_DO_MOUNT                    = wx.PyEventBinder(EVT_DO_MOUNT_TYPE)
+EVT_REEDIT_KEY_INFO             = wx.PyEventBinder(EVT_REEDIT_KEY_INFO_TYPE)
+EVT_CHECK_THREADS               = wx.PyEventBinder(EVT_CHECK_THREADS_TYPE)
+
+class EvtDoMount(wx.PyCommandEvent):
+    def __init__(self,arg=None):
+            wx.PyCommandEvent.__init__(self,EVT_DO_MOUNT_TYPE)
+            self.arg = arg
+
+class EvtReeditKeyInfo(wx.PyCommandEvent):
+    def __init__(self,keyInfo=None):
+            wx.PyCommandEvent.__init__(self,EVT_REEDIT_KEY_INFO_TYPE)
+            self.keyInfo = keyInfo
+
+class EvtCheckThreads(wx.PyCommandEvent):
+    def __init__(self,thread=None):
+            wx.PyCommandEvent.__init__(self,EVT_CHECK_THREADS_TYPE)
+            self.thread = thread
+
+
+
+class exceptionHandlingThread(threading.Thread):
+
+    def __init__(self,task,args):
+        threading.Thread.__init__(self)
+        self.task=task
+        self.args=args
+        self.Queue = Queue.Queue()
+        self.callback=None
+
+    def setCallback(self,callback):
+        self.callback=callback
+
+
+    def run(self):
+        try:
+            if self.args!= None:
+                self.task(self.args)
+            else:
+                self.task()
+        except Exception as e:
+            self.Queue.put(e)
+        if (self.callback != None):
+            self.callback()
 
 class AddHostDialog(wx.Dialog):
-    def __init__(self):
+    def __init__(self,host=None,username=None,localMntpt=None,remoteMntpt=None):
         wx.Dialog.__init__(self, None, -1, 'Add Host', style=wx.DEFAULT_DIALOG_STYLE|wx.THICK_FRAME|wx.RESIZE_BORDER|wx.TAB_TRAVERSAL)
 
         self.addHostSizer = wx.FlexGridSizer(rows=4, cols=2, vgap=5, hgap=10)
@@ -51,24 +107,32 @@ class AddHostDialog(wx.Dialog):
         self.addHostSizer.Add(self.hostLabel, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
 
         self.hostnameText = wx.TextCtrl(self, wx.ID_ANY, '', size=(200, -1))
+        if (host!=None):
+            self.hostnameText.SetValue(host)
         self.addHostSizer.Add(self.hostnameText, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
 
         self.usernameLabel = wx.StaticText(self, wx.ID_ANY, 'Username:')
         self.addHostSizer.Add(self.usernameLabel, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
 
         self.usernameText = wx.TextCtrl(self, wx.ID_ANY, '', size=(200, -1))
+        if (username !=None):
+            self.usernameText.SetValue(username)
         self.addHostSizer.Add(self.usernameText, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
 
         self.localMountPointLabel = wx.StaticText(self, wx.ID_ANY, 'Local mount point:')
         self.addHostSizer.Add(self.localMountPointLabel, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
 
         self.localMountPointText = wx.TextCtrl(self, wx.ID_ANY, '', size=(200, -1))
+        if (localMntpt!=None):
+            self.localMountPointText.SetValue(localMntpt)
         self.addHostSizer.Add(self.localMountPointText, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
 
         self.remoteMountPointLabel = wx.StaticText(self, wx.ID_ANY, 'Remote mount point:')
         self.addHostSizer.Add(self.remoteMountPointLabel, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
 
         self.remoteMountPointText = wx.TextCtrl(self, wx.ID_ANY, '', size=(200, -1))
+        if (remoteMntpt!=None):
+            self.remoteMountPointText.SetValue(remoteMntpt)
         self.addHostSizer.Add(self.remoteMountPointText, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
 
         hbox = wx.BoxSizer(wx.HORIZONTAL)
@@ -186,6 +250,10 @@ class KeyManagerFrame(wx.Frame):
         self.Centre()
 
         self.Bind(EVT_REDRAW_KEYTABLE, self.drawKeytableSizer)
+        self.Bind(EVT_SAVE_KEY_INFO, self.saveKeyInfoHandler)
+        self.Bind(EVT_DO_MOUNT, self.doMountHandler)
+        self.Bind(EVT_CHECK_THREADS, self.checkThreadsHandler)
+        self.Bind(EVT_REEDIT_KEY_INFO, self.reeditKeyInfoHandler)
 
         try:
             os.mkdir(os.path.join(expanduser('~'), '.ssh'))
@@ -198,6 +266,71 @@ class KeyManagerFrame(wx.Frame):
 
     def onExit(self, event):
         self.Destroy()
+
+
+    def checkThreadsHandler(self,event):
+        print "in checkThreadsHandler"
+        wx.EndBusyCursor()
+        try:
+            e = event.thread.Queue.get(block=False)
+            try:
+                raise e
+            except mountUtility.mountUtility.MountedException as e:
+                # TODO ... unmount and remount the mount point
+                pass
+            except mountUtility.mountUtility.NotADirectoryException as e:
+                print "caught NotADirE"
+                print e.keyInfo
+                print e.args
+                #dlg=wx.Dialog(self,style=wx.STAY_ON_TOP)
+                dlg=utilityFunctions.HelpDialog(self,pos=(200,150),size=(680,290),style=wx.STAY_ON_TOP)
+                panel=wx.Panel(dlg)
+                panel=wx.Panel(dlg)
+                sizer=wx.BoxSizer()
+                panel.SetSizer(sizer)
+                text=wx.StaticText(panel,wx.ID_ANY,label=e.__str__())
+                sizer.Add(text,0,wx.ALL,15)
+                dlg.addPanel(panel)
+                dlg.ShowModal()
+                
+                wx.PostEvent(self.GetEventHandler(),EvtReeditKeyInfo(e.keyInfo))
+                pass
+            except Exception as e:
+                print "caught other exception %s"%e
+                raise e
+        except Queue.Empty as e:
+            # Let the user know that it finished.
+            def showKeyDistSuccessDialog():
+                dlg = wx.MessageDialog(self, "Key successfully installed.\n", "CVL Key Utility", wx.OK | wx.ICON_INFORMATION)
+                dlg.ShowModal()
+                dlg.Destroy()
+            wx.CallAfter(showKeyDistSuccessDialog)
+            pass
+        except Exception as e:
+            raise e
+
+    def reeditKeyInfoHandler(self,event):
+        self.keyInfo = [z for z in self.keyInfo if z != event.keyInfo]
+        wx.PostEvent(self.GetEventHandler(),EvtSaveKeyInfo())
+
+        self.drawKeytableSizer()
+        dlg = AddHostDialog(event.keyInfo[0],event.keyInfo[1],event.keyInfo[2],event.keyInfo[3])
+        dlg.keyManagerFrame = self
+        dlg.ShowModal()
+        dlg.Destroy()
+
+        self.drawKeytableSizer()
+
+    def saveKeyInfoHandler(self,event):
+        t = exceptionHandlingThread(saveKeyInfo,self.keyInfo)
+        t.start()
+
+    def doMountHandler(self,event):
+        mount = mountUtility.mountUtility(event.arg)
+        t = exceptionHandlingThread(mount.doMount,None)
+        callback=lambda: wx.PostEvent(self.GetEventHandler(),EvtCheckThreads(t))
+        t.setCallback(callback)
+        t.start()
 
     def drawKeytableSizer(self, event=None):
         self.keySizer = wx.FlexGridSizer(rows=len(self.keyInfo), cols=6, vgap=5, hgap=10)
@@ -284,7 +417,6 @@ class KeyManagerFrame(wx.Frame):
     def onKeyDistSuccess(self):
         # The sshKeyDist module successfully installed the ssh key on the remove server. Yay!
         self.statusBar.SetStatusText('')
-        wx.EndBusyCursor()
 
         # Append the new key/mountpoint info to our list.
         self.keyInfo.append((self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint,))
@@ -294,14 +426,9 @@ class KeyManagerFrame(wx.Frame):
         wx.PostEvent(self.GetEventHandler(), EvtRedrawKeytable())
 
         # Commit the new key/mountpoint info to disk.
-        saveKeyInfo(self.keyInfo)
+        wx.PostEvent(self.GetEventHandler(),EvtSaveKeyInfo())
+        wx.PostEvent(self.GetEventHandler(),EvtDoMount(arg=(self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint,)))
 
-        # Let the user know that it finished.
-        def showKeyDistSuccessDialog():
-            dlg = wx.MessageDialog(self, "Key successfully installed.\n", "CVL Key Utility", wx.OK | wx.ICON_INFORMATION)
-            dlg.ShowModal()
-            dlg.Destroy()
-        wx.CallAfter(showKeyDistSuccessDialog)
 
     def onKeyDistFail(self):
         self.statusBar.SetStatusText('')
@@ -318,7 +445,7 @@ class KeyManagerFrame(wx.Frame):
 
         wx.BeginBusyCursor()
 
-        sshPaths = sshKeyDist.sshpaths('CVL_MANAGED_KEY')
+        sshPaths = sshKeyDist.sshpaths('MassiveLauncherKey')
         skd = sshKeyDist.KeyDist(self.userName, self.hostName, self, sshPaths)
         skd.distributeKey(callback_success=self.onKeyDistSuccess, callback_fail=self.onKeyDistFail)
 
@@ -330,9 +457,9 @@ class KeyManagerFrame(wx.Frame):
 
         self.drawKeytableSizer()
 
-    def onDelete(self, event):
+    def onDelete(self, event=None):
         self.keyInfo = [z for z in self.keyInfo if z != event.GetEventObject().keyInfo]
-        saveKeyInfo(self.keyInfo)
+        wx.PostEvent(self.GetEventHandler(),EvtSaveKeyInfo())
         self.drawKeytableSizer()
 
     def onReinstall(self, event):
