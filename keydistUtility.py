@@ -10,7 +10,7 @@ import  wx.lib.newevent
 from os.path import expanduser, join
 import os 
 
-import sshKeyDist
+import cvlsshutils.sshKeyDist
 import time
 import threading
 import Queue
@@ -417,7 +417,7 @@ class KeyManagerFrame(wx.Frame):
         self.statusBar.SetStatusText('')
 
     def onKeyDistSuccess(self):
-        # The sshKeyDist module successfully installed the ssh key on the remove server. Yay!
+        # The cvlsshutils.sshKeyDist module successfully installed the ssh key on the remove server. Yay!
         self.statusBar.SetStatusText('')
 
         # Append the new key/mountpoint info to our list.
@@ -447,8 +447,8 @@ class KeyManagerFrame(wx.Frame):
 
         wx.BeginBusyCursor()
 
-        sshPaths = sshKeyDist.sshpaths('MassiveLauncherKey')
-        skd = sshKeyDist.KeyDist(self.userName, self.hostName, self, sshPaths)
+        sshPaths = cvlsshutils.sshKeyDist.sshpaths('MassiveLauncherKey')
+        skd = cvlsshutils.sshKeyDist.KeyDist(self.userName, self.hostName, self, sshPaths)
         skd.distributeKey(callback_success=self.onKeyDistSuccess, callback_fail=self.onKeyDistFail)
 
     def onAdd(self, event):
