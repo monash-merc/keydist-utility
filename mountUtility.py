@@ -23,6 +23,11 @@ class mountUtility():
             super(mountUtility.MountedException, self).__init__(*args, **kw)
             self.keyInfo = keyInfo
 
+    class SshfsException(Exception):
+        def __init__(self, keyInfo, *args, **kw):
+            super(mountUtility.SshfsException, self).__init__(*args, **kw)
+            self.keyInfo = keyInfo
+
     class NotADirectoryException(Exception):
         def __init__(self, keyInfo, *args, **kw):
             super(mountUtility.NotADirectoryException, self).__init__(*args, **kw)
@@ -32,24 +37,24 @@ class mountUtility():
         self.username=mountTuple[1]
         self.host = mountTuple[0]
         self.localMntpt = mountTuple[2]
-        self.remoteMntpt = mountTuple[3]
+        self.remoteMntpt =mountTuple[3]
+        self.keyInfo=mountTuple
 
 
     def doMount(self):
-        print "in doMount"
         try:
-            if (not os.path.exists(self.localMntpt)):
-                os.makedirs(self.localMntpt)
+            localMntpt = os.path.expanduser(self.localMntpt)
+            if (not os.path.exists(localMntpt)):
+                os.makedirs(localMntpt)
             else:
-                if (not os.path.isdir(self.localMntpt)):
-                    raise mountUtility.NotADirectoryException((self.host, self.username, self.localMntpt, self.remoteMntpt,),"{localMntpt} is not a directory. Try configuring a different Local mount point for {username}@{host}".format(localMntpt=self.localMntpt,username=self.username,host=self.host))
+                if (not os.path.isdir(localMntpt)):
+                    raise mountUtility.NotADirectoryException(self.keyInfo,"{localMntpt} is not a directory. Try configuring a different Local mount point for {username}@{host}".format(localMntpt=self.localMntpt,username=self.username,host=self.host))
         except OSError as e:
-            raise mountUtility.NotADirectoryException((self.host, self.username, self.localMntpt, self.remoteMntpt,),"\"{localMntpt}\" Could not be used as the local mount point. Try entering a different value for the Local mount point.".format(localMntpt=self.localMntpt))
+            raise mountUtility.NotADirectoryException(self.keyInfo,"\"{localMntpt}\" Could not be used as the local mount point. Try entering a different value for the Local mount point.".format(localMntpt=self.localMntpt))
             
         if (os.path.ismount(self.localMntpt)):
-                print "trying to raise a mounted exception"
-                raise mountUtility.MountedException((self.host, self.username, self.localMntpt, self.remoteMntpt,),"already mounted")
-        sshfs_cmd='sshfs -o Ciphers=arcfour {username}@{host}:{remoteMntpt} {localMntpt}'.format(username=self.username,host=self.host,remoteMntpt=self.remoteMntpt,localMntpt=self.localMntpt)
+                raise mountUtility.MountedException(self.keyInfo,"already mounted")
+        sshfs_cmd='sshfs -o Ciphers=arcfour {username}@{host}:{remoteMntpt} {localMntpt}'.format(username=self.username,host=self.host,remoteMntpt=os.path.expanduser(self.remoteMntpt),localMntpt=localMntpt)
         # Not 100% sure if this is necessary on Windows vs Linux. Seems to break the
         # Windows version of the launcher, but leaving in for Linux/OSX.
         if sys.platform.startswith("win"):
@@ -60,6 +65,8 @@ class mountUtility():
         sshfsProcess = subprocess.Popen(sshfs_cmd,
             universal_newlines=True,shell=False,stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=None)
         (stdout,stderr)=sshfsProcess.communicate()
+        if stderr != "":
+            raise mountUtility.SshfsException(self.keyInfo,"%s"%stderr)
 
 
 def runCommandline():
@@ -69,18 +76,13 @@ def runCommandline():
         try:
             mu.doMount()
         except mountUtility.MountedException as e:
-            print "already mounted"
             pass
         except mountUtility.NotADirectoryException as e:
-            print "Not a dir exception"
             print e.args
         except OSError as e:
-            print "Oserror exception"
             print e.__str__()
         except Exception as e:
-            print "other exception"
             print e.__str__()
-            pass
 
 if __name__ == '__main__':
     runCommandline()

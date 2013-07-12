@@ -21,7 +21,16 @@ import mountUtility
 import utilityFunctions
 utilityFunctions.configureLogger('keydist-utility')
 
-KEY_INFO_FILE = join(expanduser('~'), '.cvl_key_manager.cfg')
+KEY_INFO_FILE = join(expanduser('~'), '.sshfs_mounts.cfg')
+# list of paths to search for a config file specifing command hosts to mount.
+DEFAULT_SITES_FILES= ['/etc/sshfs_default_sites.cfg',join(os.getcwd(),'.sshfs_default_sites.cfg'),join(expanduser('~'),'.sshfs_default_sites.cfg')]
+
+def loadSites():
+    cfg={}
+    for cfgfile in DEFAULT_SITES_FILES:
+        if os.path.exists(cfgfile):
+            cfg.update(json.load(open(cfgfile,'r')))
+    return cfg
 
 def uniq(x):
     return sorted(dict(zip(x, [True]*len(x))).keys())
@@ -100,42 +109,86 @@ class exceptionHandlingThread(threading.Thread):
             self.callback()
 
 class AddHostDialog(wx.Dialog):
-    def __init__(self,host=None,username=None,localMntpt=None,remoteMntpt=None):
+    def __init__(self,host=None,username=None,localMntpt=None,remoteMntpt=None,hideDefaults=True):
         wx.Dialog.__init__(self, None, -1, 'Add Host', style=wx.DEFAULT_DIALOG_STYLE|wx.THICK_FRAME|wx.RESIZE_BORDER|wx.TAB_TRAVERSAL)
+        self.hideDefaults=hideDefaults
 
-        self.addHostSizer = wx.FlexGridSizer(rows=4, cols=2, vgap=5, hgap=10)
+        #self.addHostSizer = wx.FlexGridSizer(rows=5, cols=2, vgap=5, hgap=10)
+        self.addHostSizer = wx.BoxSizer(wx.VERTICAL)
 
-        self.hostLabel = wx.StaticText(self, wx.ID_ANY, 'Hostname:')
-        self.addHostSizer.Add(self.hostLabel, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
+        self.hostPanel=wx.Panel(self)
+        self.hostPanelSizer=wx.BoxSizer(wx.HORIZONTAL)
+        self.hostPanelFieldsSizer=wx.BoxSizer(wx.VERTICAL)
+        self.hostPanel.SetSizer(self.hostPanelSizer)
+        self.addHostSizer.Add(self.hostPanel,proportion=1,flag=wx.EXPAND)
 
-        self.hostnameText = wx.TextCtrl(self, wx.ID_ANY, '', size=(200, -1))
+        self.hostLabel = wx.StaticText(self.hostPanel, wx.ID_ANY,'Hostname:')
+        self.hostPanelSizer.Add(self.hostLabel,proportion=1,flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_LEFT|wx.EXPAND, border=10)
+        self.hostPanelSizer.Add(self.hostPanelFieldsSizer,proportion=0,flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_RIGHT, border=10)
+
+        
+        self.sitesList={}
+        self.sitesList.update(loadSites())
+        default=None
+        if (host != None):
+            for key in self.sitesList.keys():
+                val = self.sitesList[key]
+                if (val['fqdn'] == host):
+                    default=key
+        if default !=None:
+            self.hostnameComboBox=wx.ComboBox(self.hostPanel, wx.ID_ANY, value=default,choices=self.sitesList.keys(), style=wx.CB_READONLY,size=(200,-1))
+        else:
+            self.hostnameComboBox=wx.ComboBox(self.hostPanel, wx.ID_ANY, choices=self.sitesList.keys(), style=wx.CB_READONLY,size=(200,-1))
+        self.hostnameComboBox.Bind(wx.EVT_COMBOBOX,self.comboBox)
+        self.hostPanelFieldsSizer.Add(self.hostnameComboBox)
+
+        self.hostnameText = wx.TextCtrl(self.hostPanel, wx.ID_ANY, '', size=(200, -1))
         if (host!=None):
             self.hostnameText.SetValue(host)
-        self.addHostSizer.Add(self.hostnameText, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
+        self.hostPanelFieldsSizer.Add(self.hostnameText,flag=wx.TOP,border=2)
 
-        self.usernameLabel = wx.StaticText(self, wx.ID_ANY, 'Username:')
-        self.addHostSizer.Add(self.usernameLabel, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
 
-        self.usernameText = wx.TextCtrl(self, wx.ID_ANY, '', size=(200, -1))
+        self.usernamePanel=wx.Panel(self)
+        self.usernamePanelSizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.usernamePanel.SetSizer(self.usernamePanelSizer)
+        self.addHostSizer.Add(self.usernamePanel,flag=wx.EXPAND)
+
+        self.usernameLabel = wx.StaticText(self.usernamePanel, wx.ID_ANY, 'Username:')
+        self.usernamePanelSizer.Add(self.usernameLabel, proportion=1,flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_LEFT|wx.EXPAND, border=10)
+
+        self.usernameText = wx.TextCtrl(self.usernamePanel, wx.ID_ANY, '', size=(200, -1))
         if (username !=None):
             self.usernameText.SetValue(username)
-        self.addHostSizer.Add(self.usernameText, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
+        self.usernamePanelSizer.Add(self.usernameText, proportion=0,flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_RIGHT|wx.EXPAND, border=10)
 
-        self.localMountPointLabel = wx.StaticText(self, wx.ID_ANY, 'Local mount point:')
-        self.addHostSizer.Add(self.localMountPointLabel, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
 
-        self.localMountPointText = wx.TextCtrl(self, wx.ID_ANY, '', size=(200, -1))
+        self.localMountPointPanel = wx.Panel(self)
+        self.localMountPointPanelSizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.localMountPointPanel.SetSizer(self.localMountPointPanelSizer)
+        self.addHostSizer.Add(self.localMountPointPanel,flag=wx.EXPAND)
+
+        self.localMountPointLabel = wx.StaticText(self.localMountPointPanel, wx.ID_ANY, 'Local mount point:')
+        self.localMountPointPanelSizer.Add(self.localMountPointLabel, proportion=1,flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_LEFT|wx.EXPAND, border=10)
+
+        self.localMountPointText = wx.TextCtrl(self.localMountPointPanel, wx.ID_ANY, '', size=(200, -1))
         if (localMntpt!=None):
             self.localMountPointText.SetValue(localMntpt)
-        self.addHostSizer.Add(self.localMountPointText, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
+        self.localMountPointPanelSizer.Add(self.localMountPointText, proportion=0,flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_RIGHT|wx.EXPAND, border=10)
 
-        self.remoteMountPointLabel = wx.StaticText(self, wx.ID_ANY, 'Remote mount point:')
-        self.addHostSizer.Add(self.remoteMountPointLabel, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
 
-        self.remoteMountPointText = wx.TextCtrl(self, wx.ID_ANY, '', size=(200, -1))
+
+        self.remoteMountPointPanel = wx.Panel(self)
+        self.remoteMountPointPanelSizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.remoteMountPointPanel.SetSizer(self.remoteMountPointPanelSizer)
+        self.addHostSizer.Add(self.remoteMountPointPanel,flag=wx.EXPAND)
+
+        self.remoteMountPointLabel = wx.StaticText(self.remoteMountPointPanel, wx.ID_ANY, 'Remote mount point:')
+        self.remoteMountPointPanelSizer.Add(self.remoteMountPointLabel, proportion=1,flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_LEFT|wx.EXPAND, border=10)
+
+        self.remoteMountPointText = wx.TextCtrl(self.remoteMountPointPanel, wx.ID_ANY, '', size=(200, -1))
         if (remoteMntpt!=None):
             self.remoteMountPointText.SetValue(remoteMntpt)
-        self.addHostSizer.Add(self.remoteMountPointText, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
+        self.remoteMountPointPanelSizer.Add(self.remoteMountPointText, proportion=0,flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_RIGHT|wx.EXPAND, border=10)
 
         hbox = wx.BoxSizer(wx.HORIZONTAL)
         okButton = wx.Button(self, label='Add')
@@ -154,7 +207,41 @@ class AddHostDialog(wx.Dialog):
 
         self.SetSizer(topSizer)
         self.CentreOnParent(wx.BOTH)
+        self.Fit()
         self.SetFocus()
+        if (self.hostnameComboBox.GetValue() == ""):
+            if (len(self.sitesList.keys())>0):
+                self.hostnameComboBox.SetValue(self.sitesList.keys()[0])
+                # We have no way of knowing what sites have been configured, but if Other is an option we'd rather not use that as the default
+                if (self.hostnameComboBox.GetValue() == "Other" or self.hostnameComboBox.GetValue() == "other" and len(self.sitesList.keys()) > 1):
+                    self.hostnameComboBox.SetValue(self.sitesList.keys()[1])
+                self.setAndHide(self.hostnameComboBox.GetValue())
+
+    def setAndHide(self,val):
+        if (self.sitesList[val].has_key("fqdn")):
+            self.hostnameText.SetValue(self.sitesList[val]["fqdn"])
+        if (self.sitesList[val].has_key("lmntpt")):
+            self.localMountPointText.SetValue(self.sitesList[val]["lmntpt"])
+        if (self.sitesList[val].has_key("rmntpt")):
+            self.remoteMountPointText.SetValue(self.sitesList[val]["rmntpt"])
+        if (self.hideDefaults):
+            if (self.hostnameText.GetValue() == ""):
+                self.hostnameText.Show()
+            else:
+                self.hostnameText.Hide()
+            if (self.localMountPointText.GetValue() == ""):
+                self.localMountPointPanel.Show()
+            else:
+                self.localMountPointPanel.Hide()
+            if (self.remoteMountPointText.GetValue() == ""):
+                self.remoteMountPointPanel.Show()
+            else:
+                self.remoteMountPointPanel.Hide()
+        self.Fit()
+
+    def comboBox(self,event):
+        val=event.GetEventObject().GetValue()
+        self.setAndHide(val)
 
     def onClose(self, event):
         wx.CallAfter(self.keyManagerFrame.statusBar.SetStatusText, '')
@@ -271,7 +358,6 @@ class KeyManagerFrame(wx.Frame):
 
 
     def checkThreadsHandler(self,event):
-        print "in checkThreadsHandler"
         wx.EndBusyCursor()
         try:
             e = event.thread.Queue.get(block=False)
@@ -281,9 +367,6 @@ class KeyManagerFrame(wx.Frame):
                 # TODO ... unmount and remount the mount point
                 pass
             except mountUtility.mountUtility.NotADirectoryException as e:
-                print "caught NotADirE"
-                print e.keyInfo
-                print e.args
                 #dlg=wx.Dialog(self,style=wx.STAY_ON_TOP)
                 dlg=utilityFunctions.HelpDialog(self,pos=(200,150),size=(680,290),style=wx.STAY_ON_TOP)
                 panel=wx.Panel(dlg)
@@ -297,8 +380,19 @@ class KeyManagerFrame(wx.Frame):
                 
                 wx.PostEvent(self.GetEventHandler(),EvtReeditKeyInfo(e.keyInfo))
                 pass
+            except mountUtility.mountUtility.SshfsException as e:
+                dlg=utilityFunctions.HelpDialog(self,pos=(200,150),size=(680,290),style=wx.STAY_ON_TOP)
+                panel=wx.Panel(dlg)
+                panel=wx.Panel(dlg)
+                sizer=wx.BoxSizer()
+                panel.SetSizer(sizer)
+                text=wx.StaticText(panel,wx.ID_ANY,label=e.__str__())
+                sizer.Add(text,0,wx.ALL,15)
+                dlg.addPanel(panel)
+                dlg.ShowModal()
+                wx.PostEvent(self.GetEventHandler(),EvtReeditKeyInfo(e.keyInfo))
+                pass
             except Exception as e:
-                print "caught other exception %s"%e
                 raise e
         except Queue.Empty as e:
             # Let the user know that it finished.
@@ -316,7 +410,7 @@ class KeyManagerFrame(wx.Frame):
         wx.PostEvent(self.GetEventHandler(),EvtSaveKeyInfo())
 
         self.drawKeytableSizer()
-        dlg = AddHostDialog(event.keyInfo[0],event.keyInfo[1],event.keyInfo[2],event.keyInfo[3])
+        dlg = AddHostDialog(event.keyInfo[0],event.keyInfo[1],event.keyInfo[2],event.keyInfo[3],hideDefaults=False)
         dlg.keyManagerFrame = self
         dlg.ShowModal()
         dlg.Destroy()
@@ -448,7 +542,7 @@ class KeyManagerFrame(wx.Frame):
         wx.BeginBusyCursor()
 
         sshPaths = cvlsshutils.sshKeyDist.sshpaths('MassiveLauncherKey')
-        skd = cvlsshutils.sshKeyDist.KeyDist(None, self.userName, self.hostName, self, sshPaths)
+        skd = cvlsshutils.sshKeyDist.KeyDist(None,self.userName, self.hostName, self, sshPaths)
         skd.distributeKey(callback_success=self.onKeyDistSuccess, callback_fail=self.onKeyDistFail)
 
     def onAdd(self, event):
