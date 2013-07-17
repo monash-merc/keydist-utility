@@ -52,7 +52,7 @@ class mountUtility():
         except OSError as e:
             raise mountUtility.NotADirectoryException(self.keyInfo,"\"{localMntpt}\" Could not be used as the local mount point. Try entering a different value for the Local mount point.".format(localMntpt=self.localMntpt))
             
-        if (os.path.ismount(self.localMntpt)):
+        if (os.path.ismount(localMntpt)):
                 raise mountUtility.MountedException(self.keyInfo,"already mounted")
         sshfs_cmd='sshfs -o Ciphers=arcfour {username}@{host}:{remoteMntpt} {localMntpt}'.format(username=self.username,host=self.host,remoteMntpt=os.path.expanduser(self.remoteMntpt),localMntpt=localMntpt)
         # Not 100% sure if this is necessary on Windows vs Linux. Seems to break the

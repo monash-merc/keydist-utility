@@ -365,6 +365,16 @@ class KeyManagerFrame(wx.Frame):
                 raise e
             except mountUtility.mountUtility.MountedException as e:
                 # TODO ... unmount and remount the mount point
+                dlg=utilityFunctions.HelpDialog(self,pos=(200,150),size=(680,290),style=wx.STAY_ON_TOP)
+                panel=wx.Panel(dlg)
+                panel=wx.Panel(dlg)
+                sizer=wx.BoxSizer()
+                panel.SetSizer(sizer)
+                msg="It looks like your trying to mount some files from a remote computer that are already mounted.\nI don't really know what you intended.\nPerhaps would would like to try setting the Hostname to Other and using some more advanced options."
+                text=wx.StaticText(panel,wx.ID_ANY,label=msg)
+                sizer.Add(text,0,wx.ALL,15)
+                dlg.addPanel(panel)
+                dlg.ShowModal()
                 pass
             except mountUtility.mountUtility.NotADirectoryException as e:
                 #dlg=wx.Dialog(self,style=wx.STAY_ON_TOP)
