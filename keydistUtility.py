@@ -61,15 +61,22 @@ EvtCheckThreads,            EVT_CHECK_THREADS               = wx.lib.newevent.Ne
 #EVT_DO_MOUNT                    = wx.lib.newevent.NewEventType()
 #EVT_REEDIT_KEY_INFO             = wx.lib.newevent.NewEventType()
 EVT_DO_MOUNT_TYPE = wx.NewEventType()
+EVT_DO_UMOUNT_TYPE = wx.NewEventType()
 EVT_REEDIT_KEY_INFO_TYPE = wx.NewEventType()
 EVT_CHECK_THREADS_TYPE = wx.NewEventType()
 EVT_DO_MOUNT                    = wx.PyEventBinder(EVT_DO_MOUNT_TYPE)
+EVT_DO_UMOUNT                    = wx.PyEventBinder(EVT_DO_UMOUNT_TYPE)
 EVT_REEDIT_KEY_INFO             = wx.PyEventBinder(EVT_REEDIT_KEY_INFO_TYPE)
 EVT_CHECK_THREADS               = wx.PyEventBinder(EVT_CHECK_THREADS_TYPE)
 
 class EvtDoMount(wx.PyCommandEvent):
     def __init__(self,arg=None):
             wx.PyCommandEvent.__init__(self,EVT_DO_MOUNT_TYPE)
+            self.arg = arg
+
+class EvtDoUMount(wx.PyCommandEvent):
+    def __init__(self,arg=None):
+            wx.PyCommandEvent.__init__(self,EVT_DO_UMOUNT_TYPE)
             self.arg = arg
 
 class EvtReeditKeyInfo(wx.PyCommandEvent):
@@ -292,7 +299,7 @@ class StatusBar(wx.StatusBar):
 
 class KeyManagerFrame(wx.Frame):
     def __init__(self):
-        wx.Frame.__init__(self, None, wx.ID_ANY, "CVL Key Manager", size=(1100,500))
+        wx.Frame.__init__(self, None, wx.ID_ANY, "Remote File Manager", size=(1100,500))
 
         self.menu_bar = wx.MenuBar()
 
@@ -304,7 +311,7 @@ class KeyManagerFrame(wx.Frame):
         self.menu_bar.Append(self.file_menu, "&File")
 
         self.help_menu = wx.Menu()
-        self.help_menu.Append(wx.ID_ABOUT,   "&About CVL Key Manager")
+        self.help_menu.Append(wx.ID_ABOUT,   "&About Remote File Manager")
         self.Bind(wx.EVT_MENU, self.onAbout, id=wx.ID_ABOUT)
         self.menu_bar.Append(self.help_menu, "&Help")
         self.SetMenuBar(self.menu_bar)
@@ -341,6 +348,7 @@ class KeyManagerFrame(wx.Frame):
         self.Bind(EVT_REDRAW_KEYTABLE, self.drawKeytableSizer)
         self.Bind(EVT_SAVE_KEY_INFO, self.saveKeyInfoHandler)
         self.Bind(EVT_DO_MOUNT, self.doMountHandler)
+        self.Bind(EVT_DO_UMOUNT, self.doUMountHandler)
         self.Bind(EVT_CHECK_THREADS, self.checkThreadsHandler)
         self.Bind(EVT_REEDIT_KEY_INFO, self.reeditKeyInfoHandler)
 
@@ -403,17 +411,19 @@ class KeyManagerFrame(wx.Frame):
                 wx.PostEvent(self.GetEventHandler(),EvtReeditKeyInfo(e.keyInfo))
                 pass
             except Exception as e:
-                raise e
+                pass
+        #          raise e
         except Queue.Empty as e:
             # Let the user know that it finished.
             def showKeyDistSuccessDialog():
                 dlg = wx.MessageDialog(self, "Key successfully installed.\n", "CVL Key Utility", wx.OK | wx.ICON_INFORMATION)
                 dlg.ShowModal()
                 dlg.Destroy()
-            wx.CallAfter(showKeyDistSuccessDialog)
+            #wx.CallAfter(showKeyDistSuccessDialog)
             pass
         except Exception as e:
             raise e
+        self.drawKeytableSizer()
 
     def reeditKeyInfoHandler(self,event):
         self.keyInfo = [z for z in self.keyInfo if z != event.keyInfo]
@@ -434,6 +444,13 @@ class KeyManagerFrame(wx.Frame):
     def doMountHandler(self,event):
         mount = mountUtility.mountUtility(event.arg)
         t = exceptionHandlingThread(mount.doMount,None)
+        callback=lambda: wx.PostEvent(self.GetEventHandler(),EvtCheckThreads(t))
+        t.setCallback(callback)
+        t.start()
+
+    def doUMountHandler(self,event):
+        mount = mountUtility.mountUtility(event.arg)
+        t = exceptionHandlingThread(mount.uMount,None)
         callback=lambda: wx.PostEvent(self.GetEventHandler(),EvtCheckThreads(t))
         t.setCallback(callback)
         t.start()
@@ -496,17 +513,25 @@ class KeyManagerFrame(wx.Frame):
             self.keySizer.Add(remoteMountPointText, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
             self.widgets.append(remoteMountPointText)
 
-            button = wx.Button(self.scrolled_panel, self.button_id, 'Reinstall')
+            button = wx.Button(self.scrolled_panel, self.button_id, 'Mount')
             button.keyInfo = (hostname, username, localMountPoint, remoteMountPoint)
-            button.Bind(wx.EVT_BUTTON, self.onReinstall)
+            button.Bind(wx.EVT_BUTTON, self.onMount)
             self.keySizer.Add(button, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
             self.widgets.append(button)
             self.button_id += 1
-
-            button = wx.Button(self.scrolled_panel, self.button_id, 'Delete')
-            button.Bind(wx.EVT_BUTTON, self.onDelete)
+            if (os.path.ismount(os.path.expanduser(localMountPoint))):
+                button.Disable()
+            else:
+                button.Enable()
+            button = wx.Button(self.scrolled_panel, self.button_id, 'Un-Mount')
+            button.Bind(wx.EVT_BUTTON, self.onUnMount)
 
             button.keyInfo = (hostname, username, localMountPoint, remoteMountPoint,)
+
+            if (not os.path.ismount(os.path.expanduser(localMountPoint))):
+                button.Disable()
+            else:
+                button.Enable()
             self.keySizer.Add(button, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
             self.widgets.append(button)
             self.button_id += 1
@@ -563,14 +588,20 @@ class KeyManagerFrame(wx.Frame):
 
         self.drawKeytableSizer()
 
-    def onDelete(self, event=None):
-        self.keyInfo = [z for z in self.keyInfo if z != event.GetEventObject().keyInfo]
-        wx.PostEvent(self.GetEventHandler(),EvtSaveKeyInfo())
+    def onUnMount(self, event=None):
+        dlg = wx.MessageDialog(self, "Would you like this filesystem to be mounted next time?\n", "CVL Key Utility", wx.YES_NO | wx.ICON_INFORMATION)
+        result = dlg.ShowModal()
+        if (result==wx.ID_NO):
+            self.keyInfo = [z for z in self.keyInfo if z != event.GetEventObject().keyInfo]
+            wx.PostEvent(self.GetEventHandler(),EvtSaveKeyInfo())
+        dlg.Destroy()
         self.drawKeytableSizer()
+        wx.PostEvent(self.GetEventHandler(),EvtDoUMount(arg=(event.GetEventObject().keyInfo)))
 
-    def onReinstall(self, event):
+    def onMount(self, event):
         (self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint) = event.GetEventObject().keyInfo
         self.runDistributeKey()
+        #wx.PostEvent(self.GetEventHandler(),EvtDoMount(arg=(self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint,)))
 
 if __name__ == '__main__':
     app = wx.App(False)

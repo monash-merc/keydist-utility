@@ -41,6 +41,27 @@ class mountUtility():
         self.keyInfo=mountTuple
 
 
+    def isMounted(self):
+        localMntpt = os.path.expanduser(self.localMntpt)
+        return os.path.isMount(localMntpt)
+
+    def uMount(self):
+        try:
+            localMntpt = os.path.expanduser(self.localMntpt)
+            umount_cmd='/bin/fusermount -u {localMntpt}/ '.format(localMntpt=localMntpt)
+            if sys.platform.startswith("win"):
+                pass
+            else:
+                umount_cmd = shlex.split(umount_cmd)
+            umountProcess = subprocess.Popen(umount_cmd,
+                universal_newlines=True,shell=False,stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=None)
+            (stdout,stderr)=umountProcess.communicate()
+            if stderr != "":
+                raise Exception("%s"%stderr)
+        except Exception as e:
+            raise e
+            
+
     def doMount(self):
         try:
             localMntpt = os.path.expanduser(self.localMntpt)
