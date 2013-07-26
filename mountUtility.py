@@ -64,6 +64,8 @@ class mountUtility():
 
     def doMount(self):
         try:
+            uid=subprocess.check_output("id -u",shell=True).strip()
+            gid=subprocess.check_output("id -g",shell=True).strip()
             localMntpt = os.path.expanduser(self.localMntpt)
             if (not os.path.exists(localMntpt)):
                 os.makedirs(localMntpt)
@@ -75,7 +77,7 @@ class mountUtility():
             
         if (os.path.ismount(localMntpt)):
                 raise mountUtility.MountedException(self.keyInfo,"already mounted")
-        sshfs_cmd='sshfs -o Ciphers=arcfour {username}@{host}:{remoteMntpt} {localMntpt}'.format(username=self.username,host=self.host,remoteMntpt=os.path.expanduser(self.remoteMntpt),localMntpt=localMntpt)
+        sshfs_cmd='sshfs -o follow_symlinks,Ciphers=arcfour,idmap=user,uid={uid},gid={gid} {username}@{host}:{remoteMntpt} {localMntpt}'.format(username=self.username,host=self.host,remoteMntpt=os.path.expanduser(self.remoteMntpt),localMntpt=localMntpt,uid=uid,gid=gid)
         # Not 100% sure if this is necessary on Windows vs Linux. Seems to break the
         # Windows version of the launcher, but leaving in for Linux/OSX.
         if sys.platform.startswith("win"):

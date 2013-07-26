@@ -90,6 +90,17 @@ class EvtCheckThreads(wx.PyCommandEvent):
             self.thread = thread
 
 
+class sshKeyDistDisplayStringsKeyDistUtil():
+    def __init__(self):
+        self.passwdPrompt="""Please enter the password for your account on {host}."""
+        self.passwdPromptIncorrect="Sorry, that password was incorrect"+self.passwdPrompt
+        self.passphrasePrompt="Please enter the passphrase for your SSH key"
+        self.passphrasePromptIncorrect="""I didn't expect to be displaying this dialog. Sorry, that passphrase was incorrect."""+self.passphrasePrompt
+        self.newPassphrase="""I didn't expect to be displaying this dialog. Please enter a new passphrase"""
+        self.newPassphraseEmptyForbiden="Sorry, empty passphrases are forbiden.\n"+self.newPassphrase
+        self.newPassphraseTooShort="Sorry, the passphrase must be at least six characters.\n"+self.newPassphrase
+        self.newPassphraseMismatch="Sorry, the two passphrases you entered don't match.\n"+self.newPassphrase
+        self.newPassphraseTitle="Please enter a new Passphrase"
 
 class exceptionHandlingThread(threading.Thread):
 
@@ -571,13 +582,19 @@ class KeyManagerFrame(wx.Frame):
             dlg.Destroy()
         wx.CallAfter(showKeyDistFailDialog)
 
+
+
+
     def runDistributeKey(self):
         self.statusBar.SetStatusText('Configuring %s on host %s' % (self.userName, self.hostName,))
 
         wx.BeginBusyCursor()
 
         sshPaths = cvlsshutils.sshKeyDist.sshpaths('MassiveLauncherKey')
-        skd = cvlsshutils.sshKeyDist.KeyDist(None,self.userName, self.hostName, self, sshPaths)
+
+        displayStrings = sshKeyDistDisplayStringsKeyDistUtil()
+
+        skd = cvlsshutils.sshKeyDist.KeyDist(None,self.userName, self.hostName, self.hostName, self, sshPaths,displayStrings)
         skd.distributeKey(callback_success=self.onKeyDistSuccess, callback_fail=self.onKeyDistFail)
 
     def onAdd(self, event):
