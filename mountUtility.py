@@ -64,8 +64,12 @@ class mountUtility():
 
     def doMount(self):
         try:
-            uid=subprocess.check_output("id -u",shell=True).strip()
-            gid=subprocess.check_output("id -g",shell=True).strip()
+            u=uid=subprocess.Popen("id -u",shell=True,stdout=subprocess.PIPE)
+            g=gid=subprocess.Popen("id -g",shell=True,stdout=subprocess.PIPE)
+            (uid,junk)=u.communicate()
+            (gid,junk)=g.communicate()
+            uid=uid.strip()
+            gid=gid.strip()
             localMntpt = os.path.expanduser(self.localMntpt)
             if (not os.path.exists(localMntpt)):
                 os.makedirs(localMntpt)
