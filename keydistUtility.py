@@ -590,11 +590,11 @@ class KeyManagerFrame(wx.Frame):
 
         wx.BeginBusyCursor()
 
-        sshPaths = cvlsshutils.sshKeyDist.sshpaths('MassiveLauncherKey')
-
         displayStrings = sshKeyDistDisplayStringsKeyDistUtil()
 
-        skd = cvlsshutils.sshKeyDist.KeyDist(None,self.userName, self.hostName, self.hostName, self, sshPaths,displayStrings)
+        from cvlsshutils.KeyModel import KeyModel
+        keymodel = KeyModel(launcherKeyName='MassiveLauncherKey')
+        skd = cvlsshutils.sshKeyDist.KeyDist(None,None,self.userName, self.hostName, self.hostName, self, keymodel,displayStrings=displayStrings)
         skd.distributeKey(callback_success=self.onKeyDistSuccess, callback_fail=self.onKeyDistFail)
 
     def onAdd(self, event):
