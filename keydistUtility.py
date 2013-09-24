@@ -572,7 +572,7 @@ class KeyManagerFrame(wx.Frame):
         wx.PostEvent(self.GetEventHandler(),EvtDoMount(arg=(self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint,)))
 
 
-    def onKeyDistFail(self):
+    def onKeyDistFail(self,arg):
         self.statusBar.SetStatusText('')
         wx.EndBusyCursor()
 
@@ -590,11 +590,11 @@ class KeyManagerFrame(wx.Frame):
 
         wx.BeginBusyCursor()
 
-        sshPaths = cvlsshutils.sshKeyDist.sshpaths('MassiveLauncherKey')
-
         displayStrings = sshKeyDistDisplayStringsKeyDistUtil()
 
-        skd = cvlsshutils.sshKeyDist.KeyDist(None,self.userName, self.hostName, self.hostName, self, sshPaths,displayStrings)
+        from cvlsshutils.KeyModel import KeyModel
+        keymodel = KeyModel(launcherKeyName='MassiveLauncherKey')
+        skd = cvlsshutils.sshKeyDist.KeyDist(None,None,self.userName, self.hostName, self.hostName, self, keymodel,displayStrings=displayStrings)
         skd.distributeKey(callback_success=self.onKeyDistSuccess, callback_fail=self.onKeyDistFail)
 
     def onAdd(self, event):
