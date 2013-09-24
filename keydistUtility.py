@@ -572,7 +572,7 @@ class KeyManagerFrame(wx.Frame):
         wx.PostEvent(self.GetEventHandler(),EvtDoMount(arg=(self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint,)))
 
 
-    def onKeyDistFail(self):
+    def onKeyDistFail(self,arg):
         self.statusBar.SetStatusText('')
         wx.EndBusyCursor()
 
