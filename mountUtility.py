@@ -8,7 +8,7 @@ import subprocess
 import Queue
 import threading
 
-KEY_INFO_FILE = join(expanduser('~'), '.cvl_key_manager.cfg')
+KEY_INFO_FILE = join(expanduser('~'), '.sshfs_mounts.cfg')
 
 def loadKeyInfo():
     if not os.path.exists(KEY_INFO_FILE): return []
