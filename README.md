@@ -11,14 +11,14 @@ A remote filesystem for SSHFS mounting on the CVL Desktop can be added to the li
 
 ![Image](https://raw.github.com/CVL-dev/keydist-utility/master/images/CVL%20Remote%20File%20Manager%20SSHFS%20mounting%20MyTardis.png?raw=true)
 
-The remote filesystem can be configured to use the CVL's LDAP directory for authentication:
+The remote file system can be configured to use the CVL's LDAP directory for authentication:
 
 ![Image](https://raw.github.com/CVL-dev/keydist-utility/master/images/CVL%20Remote%20File%20Manager%20LDAP%20authentication%20for%20MyTardis%20SSHFS%20mount.png?raw=true)
 
-Mounted filesystems are listed below:
+Mounted file systems are listed below:
 
 ![Image](https://raw.github.com/CVL-dev/keydist-utility/master/images/CVL%20Remote%20File%20Manager%20Mounted.png?raw=true)
 
-Mounted filesystems can be browsed in Nautilus (or any other file browser):
+Mounted file systems can be browsed in Nautilus (or any other file browser):
 
 ![Image](https://raw.github.com/CVL-dev/keydist-utility/master/images/MyTardis%20SSHFS%20mount%20on%20CVL%20Desktop.png?raw=true)
