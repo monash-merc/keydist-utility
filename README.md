@@ -19,6 +19,6 @@ Mounted file systems are listed below:
 
 ![Image](https://raw.github.com/CVL-dev/keydist-utility/master/images/CVL%20Remote%20File%20Manager%20Mounted.png?raw=true)
 
-Mounted file systems can be browsed in Nautilus (or any other file browser):
+User cvluser1's MyTardis data is now available as a filesystem.  This user has one MyTardis experiment (experiment ID 119) and one data set within that experiment (data set ID 252). Mounted file systems can be browsed in Nautilus (or any other file browser):
 
 ![Image](https://raw.github.com/CVL-dev/keydist-utility/master/images/MyTardis%20SSHFS%20mount%20on%20CVL%20Desktop.png?raw=true)
