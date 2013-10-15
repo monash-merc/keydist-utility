@@ -7,7 +7,7 @@ The CVL's Remote File Manager can be found in the panel at the top of the CVL De
 
 ![Image](https://raw.github.com/CVL-dev/keydist-utility/master/images/CVL%20Remote%20File%20Manager.png?raw=true)
 
-A remote filesystem for SSHFS mounting on the CVL Desktop can be added to the list:
+To add a new SSHFS mount point to the CVL Desktop, click the "Add Host" button:
 
 ![Image](https://raw.github.com/CVL-dev/keydist-utility/master/images/CVL%20Remote%20File%20Manager%20SSHFS%20mounting%20MyTardis.png?raw=true)
 
