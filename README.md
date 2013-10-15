@@ -1,6 +1,6 @@
 keydist-utility
 ===============
 
-CVL desktop utility for distributing SSH keys
+CVL desktop utility for distributing SSH keys, also know as the CVL's Remote File Manager.
 
-The files `sshKeyDist.py` and `utilityFunctions.py` are to be manually kept in sync with https://github.com/CVL-dev/cvl-fabric-launcher/blob/CVLFAB-545-two-part-ui/sshKeyDist.py and https://github.com/CVL-dev/cvl-fabric-launcher/blob/CVLFAB-545-two-part-ui/utilityFunctions.py
+![Image](https://raw.github.com/CVL-dev/keydist-utility/master/images/CVL%20Remote%20File%20Manager.png?raw=true)
