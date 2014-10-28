@@ -50,7 +50,8 @@ def isValidHostname(h):
 
 def isValidUsername(u):
     # FIXME check this
-    return all([x.isalnum() or x in ['-', '.'] for x in u])
+    return True
+    #return all([x.isalnum() or x in ['-', '.'] for x in u])
 
 EvtRedrawKeytable,          EVT_REDRAW_KEYTABLE             = wx.lib.newevent.NewEvent()
 EvtCancelKeyDistribution,   EVT_CANCEL_KEY_DISTRIBUTION     = wx.lib.newevent.NewEvent()
@@ -127,7 +128,7 @@ class exceptionHandlingThread(threading.Thread):
             self.callback()
 
 class AddHostDialog(wx.Dialog):
-    def __init__(self,host=None,username=None,localMntpt=None,remoteMntpt=None,hideDefaults=True):
+    def __init__(self,host=None,username=None,localMntpt=None,remoteMntpt=None,hideDefaults=True,port="22"):
         wx.Dialog.__init__(self, None, -1, 'Add Host', style=wx.DEFAULT_DIALOG_STYLE|wx.THICK_FRAME|wx.RESIZE_BORDER|wx.TAB_TRAVERSAL)
         self.hideDefaults=hideDefaults
 
@@ -207,6 +208,21 @@ class AddHostDialog(wx.Dialog):
         if (remoteMntpt!=None):
             self.remoteMountPointText.SetValue(remoteMntpt)
         self.remoteMountPointPanelSizer.Add(self.remoteMountPointText, proportion=0,flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_RIGHT|wx.EXPAND, border=10)
+        self.portPanel = wx.Panel(self)
+        self.portPanelSizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.portPanel.SetSizer(self.portPanelSizer)
+        self.addHostSizer.Add(self.portPanel,flag=wx.EXPAND)
+
+        self.portLabel = wx.StaticText(self.portPanel, wx.ID_ANY, 'Port:')
+        self.portPanelSizer.Add(self.portLabel, proportion=1,flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_LEFT|wx.EXPAND, border=10)
+
+        self.portText = wx.TextCtrl(self.portPanel, wx.ID_ANY, '', size=(200, -1))
+        self.portPanelSizer.Add(self.portText, proportion=0,flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_RIGHT|wx.EXPAND, border=10)
+
+        if (port!=None):
+            self.portText.SetValue(port)
+        else:
+            self.portText.SetValue("")
 
         hbox = wx.BoxSizer(wx.HORIZONTAL)
         okButton = wx.Button(self, label='Add')
@@ -242,6 +258,10 @@ class AddHostDialog(wx.Dialog):
             self.localMountPointText.SetValue(self.sitesList[val]["lmntpt"])
         if (self.sitesList[val].has_key("rmntpt")):
             self.remoteMountPointText.SetValue(self.sitesList[val]["rmntpt"])
+        if (self.sitesList[val].has_key("port")):
+            self.portText.SetValue(self.sitesList[val]["port"])
+        else:
+            self.portText.SetValue("")
         if (self.hideDefaults):
             if (self.hostnameText.GetValue() == ""):
                 self.hostnameText.Show()
@@ -255,6 +275,10 @@ class AddHostDialog(wx.Dialog):
                 self.remoteMountPointPanel.Show()
             else:
                 self.remoteMountPointPanel.Hide()
+            if (self.portText.GetValue() == ""):
+                self.portPanel.Show()
+            else:
+                self.portPanel.Hide()
         self.Fit()
 
     def comboBox(self,event):
@@ -271,6 +295,7 @@ class AddHostDialog(wx.Dialog):
         userName            = self.usernameText.GetValue()
         localMountPoint     = self.localMountPointText.GetValue()
         remoteMountPoint    = self.remoteMountPointText.GetValue()
+        port    = self.portText.GetValue()
 
         userCanAbort            = True
         maximumProgressBarValue = 10
@@ -279,6 +304,7 @@ class AddHostDialog(wx.Dialog):
         self.keyManagerFrame.userName           = userName
         self.keyManagerFrame.localMountPoint    = localMountPoint
         self.keyManagerFrame.remoteMountPoint   = remoteMountPoint
+        self.keyManagerFrame.port   = port
 
         if not isValidHostname(hostName):
             def showHostnameInvalidDialog():
@@ -441,7 +467,7 @@ class KeyManagerFrame(wx.Frame):
         wx.PostEvent(self.GetEventHandler(),EvtSaveKeyInfo())
 
         self.drawKeytableSizer()
-        dlg = AddHostDialog(event.keyInfo[0],event.keyInfo[1],event.keyInfo[2],event.keyInfo[3],hideDefaults=False)
+        dlg = AddHostDialog(event.keyInfo[0],event.keyInfo[1],event.keyInfo[2],event.keyInfo[3],hideDefaults=False,port=event.keyInfo[4])
         dlg.keyManagerFrame = self
         dlg.ShowModal()
         dlg.Destroy()
@@ -467,7 +493,7 @@ class KeyManagerFrame(wx.Frame):
         t.start()
 
     def drawKeytableSizer(self, event=None):
-        self.keySizer = wx.FlexGridSizer(rows=len(self.keyInfo), cols=6, vgap=5, hgap=10)
+        self.keySizer = wx.FlexGridSizer(rows=len(self.keyInfo), cols=7, vgap=5, hgap=10)
 
         for w in self.widgets:
             w.Hide()
@@ -493,6 +519,11 @@ class KeyManagerFrame(wx.Frame):
         self.keySizer.Add(remoteMountPointText, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
         self.widgets.append(remoteMountPointText)
 
+        portText = wx.StaticText(self.scrolled_panel, wx.ID_ANY, 'Port')
+        portText.SetFont(wx.Font(14, wx.DEFAULT, wx.NORMAL, wx.BOLD))
+        self.keySizer.Add(portText, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
+        self.widgets.append(portText)
+
         editEmpty = wx.StaticText(self.scrolled_panel, wx.ID_ANY, '')
         self.keySizer.Add(editEmpty, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
         self.widgets.append(editEmpty)
@@ -501,7 +532,7 @@ class KeyManagerFrame(wx.Frame):
         self.keySizer.Add(deleteEmpty, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
         self.widgets.append(deleteEmpty)
 
-        for (hostname, username, localMountPoint, remoteMountPoint,) in sorted(self.keyInfo):
+        for (hostname, username, localMountPoint, remoteMountPoint,port,) in sorted(self.keyInfo):
             hostLabel = wx.StaticText(self.scrolled_panel, wx.ID_ANY, hostname)
             self.keySizer.Add(hostLabel, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
             self.widgets.append(hostLabel)
@@ -523,9 +554,13 @@ class KeyManagerFrame(wx.Frame):
                 remoteMountPointText = wx.StaticText(self.scrolled_panel, wx.ID_ANY, remoteMountPoint)
             self.keySizer.Add(remoteMountPointText, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
             self.widgets.append(remoteMountPointText)
+            
+            portText=wx.StaticText(self.scrolled_panel,wx.ID_ANY,port)
+            self.keySizer.Add(portText, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
+            self.widgets.append(portText)
 
             button = wx.Button(self.scrolled_panel, self.button_id, 'Mount')
-            button.keyInfo = (hostname, username, localMountPoint, remoteMountPoint)
+            button.keyInfo = (hostname, username, localMountPoint, remoteMountPoint,port,)
             button.Bind(wx.EVT_BUTTON, self.onMount)
             self.keySizer.Add(button, flag=wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT|wx.ALIGN_CENTER_VERTICAL, border=10)
             self.widgets.append(button)
@@ -537,7 +572,7 @@ class KeyManagerFrame(wx.Frame):
             button = wx.Button(self.scrolled_panel, self.button_id, 'Un-Mount')
             button.Bind(wx.EVT_BUTTON, self.onUnMount)
 
-            button.keyInfo = (hostname, username, localMountPoint, remoteMountPoint,)
+            button.keyInfo = (hostname, username, localMountPoint, remoteMountPoint,port,)
 
             if (not os.path.ismount(os.path.expanduser(localMountPoint))):
                 button.Disable()
@@ -561,7 +596,7 @@ class KeyManagerFrame(wx.Frame):
         self.statusBar.SetStatusText('')
 
         # Append the new key/mountpoint info to our list.
-        self.keyInfo.append((self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint,))
+        self.keyInfo.append((self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint,self.port))
         self.keyInfo = uniq(self.keyInfo)
 
         # Redraw the table of keypairs.
@@ -569,7 +604,7 @@ class KeyManagerFrame(wx.Frame):
 
         # Commit the new key/mountpoint info to disk.
         wx.PostEvent(self.GetEventHandler(),EvtSaveKeyInfo())
-        wx.PostEvent(self.GetEventHandler(),EvtDoMount(arg=(self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint,)))
+        wx.PostEvent(self.GetEventHandler(),EvtDoMount(arg=(self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint,self.port,)))
 
 
     def onKeyDistFail(self,arg):
@@ -594,7 +629,7 @@ class KeyManagerFrame(wx.Frame):
 
         from cvlsshutils.KeyModel import KeyModel
         keymodel = KeyModel(launcherKeyName='MassiveLauncherKey')
-        skd = cvlsshutils.sshKeyDist.KeyDist(None,None,self.userName, self.hostName, self.hostName, self, keymodel,displayStrings=displayStrings)
+        skd = cvlsshutils.sshKeyDist.KeyDist(parentWindow=self,notifywindow=self,progressDialog=None,username=self.userName, host=self.hostName, keyModel=keymodel,displayStrings=displayStrings,copymethod='sftpAuth',port=self.port)
         skd.distributeKey(callback_success=self.onKeyDistSuccess, callback_fail=self.onKeyDistFail)
 
     def onAdd(self, event):
@@ -616,7 +651,7 @@ class KeyManagerFrame(wx.Frame):
         wx.PostEvent(self.GetEventHandler(),EvtDoUMount(arg=(event.GetEventObject().keyInfo)))
 
     def onMount(self, event):
-        (self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint) = event.GetEventObject().keyInfo
+        (self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint,self.port) = event.GetEventObject().keyInfo
         self.runDistributeKey()
         #wx.PostEvent(self.GetEventHandler(),EvtDoMount(arg=(self.hostName, self.userName, self.localMountPoint, self.remoteMountPoint,)))
 
