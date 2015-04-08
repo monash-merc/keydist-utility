@@ -38,6 +38,10 @@ class mountUtility():
         self.host = mountTuple[0]
         self.localMntpt = mountTuple[2]
         self.remoteMntpt =mountTuple[3]
+        if len(mountTuple)==5:
+            self.port=mountTuple[4]
+        else:
+            self.port=22
         self.keyInfo=mountTuple
 
 
@@ -78,10 +82,14 @@ class mountUtility():
                     raise mountUtility.NotADirectoryException(self.keyInfo,"{localMntpt} is not a directory. Try configuring a different Local mount point for {username}@{host}".format(localMntpt=self.localMntpt,username=self.username,host=self.host))
         except OSError as e:
             raise mountUtility.NotADirectoryException(self.keyInfo,"\"{localMntpt}\" Could not be used as the local mount point. Try entering a different value for the Local mount point.".format(localMntpt=self.localMntpt))
+        except Exception as e:
+            raise(e)
             
         if (os.path.ismount(localMntpt)):
                 raise mountUtility.MountedException(self.keyInfo,"already mounted")
-        sshfs_cmd='sshfs -o follow_symlinks,Ciphers=arcfour,idmap=user,uid={uid},gid={gid} {username}@{host}:{remoteMntpt} {localMntpt}'.format(username=self.username,host=self.host,remoteMntpt=os.path.expanduser(self.remoteMntpt),localMntpt=localMntpt,uid=uid,gid=gid)
+        sshfs_cmd='sshfs -o follow_symlinks,Ciphers=arcfour,idmap=user,uid={uid},gid={gid} -p {port} {username}@{host}:{remoteMntpt} {localMntpt}'.format(username=self.username,host=self.host,remoteMntpt=os.path.expanduser(self.remoteMntpt),localMntpt=localMntpt,uid=uid,gid=gid,port=self.port)
+        if 'store.sync' in self.host:
+            sshfs_cmd='sshfs -o PasswordAuthentication=no -p {port} {username}@{host}:{remoteMntpt} {localMntpt}'.format(username=self.username,host=self.host,remoteMntpt=os.path.expanduser(self.remoteMntpt),localMntpt=localMntpt,uid=uid,gid=gid,port=self.port)
         # Not 100% sure if this is necessary on Windows vs Linux. Seems to break the
         # Windows version of the launcher, but leaving in for Linux/OSX.
         if sys.platform.startswith("win"):
