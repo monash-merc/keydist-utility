@@ -618,9 +618,36 @@ class KeyManagerFrame(wx.Frame):
         wx.CallAfter(showKeyDistFailDialog)
 
 
+    def authAndLogin(self,nextSub,failSub=None):
+     try:
+         print "running skd.authorise"
+         self.skd.authorise()
+         print "skd authorise completed"
+         if not self.skd.canceled():
+             print "running nextSub"
+             self.progressDialog=None
+             nextSub()
+         else:
+             print "skd canceled"
+             if failSub!=None:
+                 failSub()
+     except Exception as e:
+         print e
+         import traceback
+         print traceback.format_exc()
+         print "skd exception"
+         if failSub!=None:
+             failSub()
+ 
 
 
     def runDistributeKey(self):
+        class siteConfig(object):
+            def __init__(self,loginHost,displayStrings,*args,**kwargs):
+                super(siteConfig,self).__init__(*args,**kwargs)
+                self.loginHost=loginHost
+                self.displayStrings=displayStrings
+                self.authURL=None
         self.statusBar.SetStatusText('Configuring %s on host %s' % (self.userName, self.hostName,))
 
         wx.BeginBusyCursor()
@@ -628,9 +655,18 @@ class KeyManagerFrame(wx.Frame):
         displayStrings = sshKeyDistDisplayStringsKeyDistUtil()
 
         from cvlsshutils.KeyModel import KeyModel
+        import cvlsshutils.skd_thread
         keymodel = KeyModel(launcherKeyName='MassiveLauncherKey')
-        skd = cvlsshutils.sshKeyDist.KeyDist(parentWindow=self,notifywindow=self,progressDialog=None,username=self.userName, host=self.hostName, keyModel=keymodel,displayStrings=displayStrings,copymethod='sftpAuth',port=self.port)
-        skd.distributeKey(callback_success=self.onKeyDistSuccess, callback_fail=self.onKeyDistFail)
+#        skd = cvlsshutils.sshKeyDist.KeyDist(parentWindow=self,notifywindow=self,progressDialog=None,username=self.userName, host=self.hostName, keyModel=keymodel,displayStrings=displayStrings,copymethod='sftpAuth',port=self.port)
+#        skd.distributeKey(callback_success=self.onKeyDistSuccess, callback_fail=self.onKeyDistFail)
+        jobParams={'username':self.userName}
+        sc=siteConfig(self.hostName,displayStrings)
+
+
+        self.skd = cvlsshutils.skd_thread.KeyDist(keyModel=keymodel,parentWindow=self,progressDialog=None,jobParams=jobParams,siteConfig=sc)
+        t=threading.Thread(target=self.authAndLogin,args=[lambda:wx.CallAfter(self.onKeyDistSuccess)])
+        t.start()
+        t.join()
 
     def onAdd(self, event):
         dlg = AddHostDialog()
