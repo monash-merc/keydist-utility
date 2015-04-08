@@ -620,22 +620,17 @@ class KeyManagerFrame(wx.Frame):
 
     def authAndLogin(self,nextSub,failSub=None):
      try:
-         print "running skd.authorise"
          self.skd.authorise()
-         print "skd authorise completed"
          if not self.skd.canceled():
-             print "running nextSub"
              self.progressDialog=None
              nextSub()
          else:
-             print "skd canceled"
              if failSub!=None:
                  failSub()
      except Exception as e:
          print e
          import traceback
          print traceback.format_exc()
-         print "skd exception"
          if failSub!=None:
              failSub()
  
